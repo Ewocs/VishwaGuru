@@ -1,7 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from backend.database import engine, get_db
+from backend.models import Base, Issue
+from backend.ai_service import generate_action_plan
 import json
 import os
+import shutil
+import uuid
+from fastapi import Depends
+
+# Create tables if they don't exist
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="VishwaGuru Backend")
 
@@ -21,6 +31,45 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+@app.post("/api/issues")
+async def create_issue(
+    description: str = Form(...),
+    category: str = Form(...),
+    image: UploadFile = File(None),
+    db: Session = Depends(get_db)
+):
+    # Save image if provided
+    image_path = None
+    if image:
+        upload_dir = "data/uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+        # Generate unique filename
+        filename = f"{uuid.uuid4()}_{image.filename}"
+        image_path = os.path.join(upload_dir, filename)
+
+        with open(image_path, "wb") as buffer:
+            shutil.copyfileobj(image.file, buffer)
+
+    # Save to DB
+    new_issue = Issue(
+        description=description,
+        category=category,
+        image_path=image_path,
+        source="web"
+    )
+    db.add(new_issue)
+    db.commit()
+    db.refresh(new_issue)
+
+    # Generate Action Plan (AI)
+    action_plan = generate_action_plan(description, category, image_path)
+
+    return {
+        "id": new_issue.id,
+        "message": "Issue reported successfully",
+        "action_plan": action_plan
+    }
 
 @app.get("/api/responsibility-map")
 def get_responsibility_map():
