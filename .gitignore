@@ -5,6 +5,10 @@ __pycache__/
 *.log
 *.pid
 
+# Data
+data/*.db
+data/uploads/
+
 # Node
 node_modules/
 dist/
