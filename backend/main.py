@@ -16,6 +16,9 @@ import asyncio
 from fastapi import Depends
 from contextlib import asynccontextmanager
 from bot import run_bot
+from pothole_detection import detect_potholes
+from PIL import Image
+import io
 
 # Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
@@ -127,6 +130,25 @@ def get_responsibility_map():
         return _load_responsibility_map()
     except FileNotFoundError:
         return {"error": "Data file not found"}
+
+@app.post("/api/detect-pothole")
+async def detect_pothole_endpoint(image: UploadFile = File(...)):
+    # Read image
+    contents = await image.read()
+    # Convert to PIL Image
+    try:
+        pil_image = Image.open(io.BytesIO(contents))
+    except Exception:
+         raise HTTPException(status_code=400, detail="Invalid image file")
+
+    # Run detection (blocking, so run in threadpool)
+    try:
+        detections = await run_in_threadpool(detect_potholes, pil_image)
+    except Exception as e:
+        print(f"Detection error: {e}")
+        raise HTTPException(status_code=500, detail="Error processing image for detection")
+
+    return {"detections": detections}
 
 @app.get("/api/mh/rep-contacts")
 async def get_maharashtra_rep_contacts(pincode: str = Query(..., min_length=6, max_length=6)):
