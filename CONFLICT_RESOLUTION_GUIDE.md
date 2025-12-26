@@ -229,7 +229,7 @@ To prevent similar issues:
 
 - [MERGE_REQUEST_ANALYSIS.md](./MERGE_REQUEST_ANALYSIS.md) - Detailed technical analysis
 - [PR_RESOLUTION_SUMMARY.md](./PR_RESOLUTION_SUMMARY.md) - Quick reference guide
-- PR #20 - The merged PR that implemented MLA optimization
+- [PR #20](https://github.com/RohanExploit/VishwaGuru/pull/20) - The merged PR that implemented MLA optimization
 - Main branch commit a61a1b4 and subsequent commits
 
 ## Contact

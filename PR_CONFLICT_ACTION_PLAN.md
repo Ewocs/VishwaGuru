@@ -141,11 +141,11 @@ This PR has no conflicts and addresses a valid issue. Standard review process ap
 
 | PR # | Title | Status | Action | Priority |
 |------|-------|--------|--------|----------|
-| #18 | Optimize MLA lookup with O(1) map | ❌ Has conflicts | Close | HIGH |
-| #17 | Optimize MLA lookup and fix tests | ⚠️ Draft, duplicates | Close | HIGH |
-| #16 | Optimize pincode and MLA lookup | ⚠️ Draft, duplicates | Close | HIGH |
-| #14 | Optimize Backend + user_email | ⚠️ Draft, 1 unique feature | Decide & close | MEDIUM |
-| #6 | Fix blocking I/O in async | ✅ No conflicts | Continue review | LOW |
+| #18 | MLA lookup O(1) optimization | ❌ Has conflicts | Close | HIGH |
+| #17 | MLA lookup + test fixes | ⚠️ Draft, duplicates | Close | HIGH |
+| #16 | Pincode/MLA O(1) optimization | ⚠️ Draft, duplicates | Close | HIGH |
+| #14 | Backend optimization + user_email | ⚠️ Draft, 1 unique | Decide & close | MEDIUM |
+| #6 | Fix async I/O blocking | ✅ No conflicts | Continue review | LOW |
 
 ---
 
