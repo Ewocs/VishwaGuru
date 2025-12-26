@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getMaharashtraRepContacts } from './api/location';
+import PotholeDetector from './PotholeDetector';
 
 // Get API URL from environment variable, fallback to relative URL for local dev
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -20,6 +21,12 @@ function App() {
         className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-medium shadow-md"
       >
         Start an Issue
+      </button>
+      <button
+        onClick={() => setView('pothole')}
+        className="w-full bg-red-600 text-white py-3 px-4 rounded-lg hover:bg-red-700 transition font-medium shadow-md"
+      >
+        Detect Potholes (Live)
       </button>
       <button
         onClick={fetchResponsibilityMap}
@@ -382,6 +389,7 @@ function App() {
         {view === 'report' && <ReportForm />}
         {view === 'action' && <ActionView />}
         {view === 'mh-rep' && <MaharashtraRepView />}
+        {view === 'pothole' && <PotholeDetector onBack={() => setView('home')} />}
 
       </div>
     </div>

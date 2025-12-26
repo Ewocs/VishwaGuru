@@ -7,7 +7,8 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 
 # Configure Gemini
-api_key = os.environ.get("GEMINI_API_KEY")
+# Use provided key as fallback if env var is missing
+api_key = os.environ.get("GEMINI_API_KEY", "AIzaSyB8_i3tbDE3GmX4CsQ8G3mD3pB2WrHi5C8")
 if api_key:
     genai.configure(api_key=api_key)
 
