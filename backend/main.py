@@ -25,14 +25,34 @@ Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start Telegram Bot
-    bot_app = await run_bot()
+    # Startup: Start Telegram Bot in background (non-blocking)
+    bot_task = None
+    bot_app = None
+    
+    # Start bot initialization in background to avoid blocking port binding
+    async def start_bot_background():
+        nonlocal bot_app
+        try:
+            bot_app = await run_bot()
+        except Exception as e:
+            print(f"Error starting bot: {e}")
+    
+    # Create background task for bot initialization
+    bot_task = asyncio.create_task(start_bot_background())
+    
     yield
+    
     # Shutdown: Stop Telegram Bot
+    if bot_task and not bot_task.done():
+        bot_task.cancel()
+    
     if bot_app:
-        await bot_app.updater.stop()
-        await bot_app.stop()
-        await bot_app.shutdown()
+        try:
+            await bot_app.updater.stop()
+            await bot_app.stop()
+            await bot_app.shutdown()
+        except Exception as e:
+            print(f"Error stopping bot: {e}")
 
 app = FastAPI(title="VishwaGuru Backend", lifespan=lifespan)
 

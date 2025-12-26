@@ -113,38 +113,37 @@ async def run_bot():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
         print("Warning: TELEGRAM_BOT_TOKEN environment variable not set. Bot will not start.")
-        return
+        return None
 
-    application = ApplicationBuilder().token(token).build()
+    try:
+        application = ApplicationBuilder().token(token).build()
 
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            PHOTO: [MessageHandler(filters.PHOTO, receive_photo)],
-            DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_description)],
-            CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_category)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("start", start)],
+            states={
+                PHOTO: [MessageHandler(filters.PHOTO, receive_photo)],
+                DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_description)],
+                CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_category)],
+            },
+            fallbacks=[CommandHandler("cancel", cancel)],
+        )
 
-    application.add_handler(conv_handler)
+        application.add_handler(conv_handler)
 
-    print("Bot is starting...")
-    # Initialize and start the application
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
+        print("Bot is starting...")
+        # Initialize and start the application
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
 
-    # Keep the bot running
-    # In a real asyncio loop, we might wait on a future or similar.
-    # But since this is a background task in FastAPI, it will run until the loop stops.
-    # However, application.updater.start_polling() is non-blocking (starts background task).
-    # We don't need to block here.
-
-    # Wait for stop signal?
-    # For MVP simplicity in FastAPI lifespan:
-    # We just return application so we can stop it later.
-    return application
+        print("Bot started successfully and is polling for updates.")
+        
+        # Return application so we can stop it later
+        return application
+    except Exception as e:
+        print(f"Error initializing bot: {e}")
+        logging.error(f"Bot initialization failed: {e}")
+        return None
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
