@@ -18,11 +18,24 @@ from fastapi import Depends
 from contextlib import asynccontextmanager
 from bot import run_bot
 from pothole_detection import detect_potholes
+from garbage_detection import detect_garbage
 from PIL import Image
 import io
+from sqlalchemy import text
 
 # Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
+
+# Attempt to migrate schema (add upvotes column if missing)
+# This is a simple MVP migration strategy
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE issues ADD COLUMN upvotes INTEGER DEFAULT 0"))
+        conn.commit()
+        print("Migrated database: Added upvotes column.")
+except Exception as e:
+    # Column likely already exists
+    pass
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -142,6 +155,22 @@ async def create_issue(
         "action_plan": action_plan
     }
 
+@app.post("/api/issues/{issue_id}/vote")
+def upvote_issue(issue_id: int, db: Session = Depends(get_db)):
+    issue = db.query(Issue).filter(Issue.id == issue_id).first()
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    # Increment upvotes
+    if issue.upvotes is None:
+        issue.upvotes = 0
+    issue.upvotes += 1
+
+    db.commit()
+    db.refresh(issue)
+
+    return {"id": issue.id, "upvotes": issue.upvotes, "message": "Upvoted successfully"}
+
 @lru_cache(maxsize=1)
 def _load_responsibility_map():
     # Assuming the data folder is at the root level relative to where backend is run
@@ -180,7 +209,8 @@ def get_recent_issues(db: Session = Depends(get_db)):
             "description": i.description[:100] + "..." if len(i.description) > 100 else i.description,
             "created_at": i.created_at,
             "image_path": i.image_path,
-            "status": i.status
+            "status": i.status,
+            "upvotes": i.upvotes if i.upvotes is not None else 0
         }
         for i in issues
     ]
@@ -198,6 +228,25 @@ async def detect_pothole_endpoint(image: UploadFile = File(...)):
     # Run detection (blocking, so run in threadpool)
     try:
         detections = await run_in_threadpool(detect_potholes, pil_image)
+    except Exception as e:
+        print(f"Detection error: {e}")
+        raise HTTPException(status_code=500, detail="Error processing image for detection")
+
+    return {"detections": detections}
+
+@app.post("/api/detect-garbage")
+async def detect_garbage_endpoint(image: UploadFile = File(...)):
+    # Read image
+    contents = await image.read()
+    # Convert to PIL Image
+    try:
+        pil_image = Image.open(io.BytesIO(contents))
+    except Exception:
+         raise HTTPException(status_code=400, detail="Invalid image file")
+
+    # Run detection (blocking, so run in threadpool)
+    try:
+        detections = await run_in_threadpool(detect_garbage, pil_image)
     except Exception as e:
         print(f"Detection error: {e}")
         raise HTTPException(status_code=500, detail="Error processing image for detection")
