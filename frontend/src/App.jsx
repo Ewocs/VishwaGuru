@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { getMaharashtraRepContacts } from './api/location';
 import PotholeDetector from './PotholeDetector';
+import GarbageDetector from './GarbageDetector';
 import ChatWidget from './components/ChatWidget';
-import { AlertTriangle, MapPin, Search, Activity, Camera } from 'lucide-react';
+import { AlertTriangle, MapPin, Search, Activity, Camera, Trash2, ThumbsUp } from 'lucide-react';
 
 // Get API URL from environment variable, fallback to relative URL for local dev
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 function App() {
-  const [view, setView] = useState('home'); // home, map, report, action, mh-rep
+  const [view, setView] = useState('home'); // home, map, report, action, mh-rep, pothole, garbage
   const [responsibilityMap, setResponsibilityMap] = useState(null);
   const [actionPlan, setActionPlan] = useState(null);
   const [maharashtraRepInfo, setMaharashtraRepInfo] = useState(null);
@@ -17,20 +18,37 @@ function App() {
   const [error, setError] = useState(null);
 
   // Fetch recent issues on mount
-  useEffect(() => {
-    const fetchRecentIssues = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/issues/recent`);
-        if (response.ok) {
-          const data = await response.json();
-          setRecentIssues(data);
-        }
-      } catch (e) {
-        console.error("Failed to fetch recent issues", e);
+  const fetchRecentIssues = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/issues/recent`);
+      if (response.ok) {
+        const data = await response.json();
+        setRecentIssues(data);
       }
-    };
+    } catch (e) {
+      console.error("Failed to fetch recent issues", e);
+    }
+  };
+
+  useEffect(() => {
     fetchRecentIssues();
   }, []);
+
+  const handleUpvote = async (id) => {
+    try {
+        const response = await fetch(`${API_URL}/api/issues/${id}/vote`, {
+            method: 'POST'
+        });
+        if (response.ok) {
+            // Update local state to reflect change immediately (optimistic UI or re-fetch)
+            setRecentIssues(prev => prev.map(issue =>
+                issue.id === id ? { ...issue, upvotes: (issue.upvotes || 0) + 1 } : issue
+            ));
+        }
+    } catch (e) {
+        console.error("Failed to upvote", e);
+    }
+  };
 
   // Home View Components
   const Home = () => (
@@ -58,6 +76,16 @@ function App() {
         </button>
 
         <button
+          onClick={() => setView('garbage')}
+          className="flex flex-col items-center justify-center bg-orange-50 border-2 border-orange-100 p-4 rounded-xl hover:bg-orange-100 transition shadow-sm h-32"
+        >
+          <div className="bg-orange-500 text-white p-3 rounded-full mb-2">
+            <Trash2 size={24} />
+          </div>
+          <span className="font-semibold text-orange-800">Detect Garbage</span>
+        </button>
+
+        <button
           onClick={() => setView('mh-rep')}
           className="flex flex-col items-center justify-center bg-purple-50 border-2 border-purple-100 p-4 rounded-xl hover:bg-purple-100 transition shadow-sm h-32"
         >
@@ -66,15 +94,17 @@ function App() {
           </div>
           <span className="font-semibold text-purple-800">Find MLA</span>
         </button>
+      </div>
 
-        <button
+      <div className="grid grid-cols-1">
+         <button
           onClick={fetchResponsibilityMap}
-          className="flex flex-col items-center justify-center bg-green-50 border-2 border-green-100 p-4 rounded-xl hover:bg-green-100 transition shadow-sm h-32"
+          className="flex flex-row items-center justify-center bg-green-50 border-2 border-green-100 p-4 rounded-xl hover:bg-green-100 transition shadow-sm h-16"
         >
-          <div className="bg-green-500 text-white p-3 rounded-full mb-2">
-            <MapPin size={24} />
+          <div className="bg-green-500 text-white p-2 rounded-full mr-3">
+            <MapPin size={20} />
           </div>
-          <span className="font-semibold text-green-800">Responsibility</span>
+          <span className="font-semibold text-green-800">Who is Responsible?</span>
         </button>
       </div>
 
@@ -92,9 +122,18 @@ function App() {
                   <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 mb-1 capitalize">
                     {issue.category}
                   </span>
-                  <span className="text-xs text-gray-400">
-                    {new Date(issue.created_at).toLocaleDateString()}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => handleUpvote(issue.id)}
+                        className="flex items-center gap-1 text-gray-500 hover:text-blue-600 text-xs"
+                    >
+                        <ThumbsUp size={12} />
+                        <span>{issue.upvotes || 0}</span>
+                    </button>
+                    <span className="text-xs text-gray-400">
+                        {new Date(issue.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
                 <p className="text-sm text-gray-700 line-clamp-2">{issue.description}</p>
               </div>
@@ -468,6 +507,7 @@ function App() {
         {view === 'action' && <ActionView />}
         {view === 'mh-rep' && <MaharashtraRepView />}
         {view === 'pothole' && <PotholeDetector onBack={() => setView('home')} />}
+        {view === 'garbage' && <GarbageDetector onBack={() => setView('home')} />}
 
       </div>
     </div>
