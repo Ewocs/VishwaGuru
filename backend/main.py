@@ -5,7 +5,8 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from database import engine, get_db
 from models import Base, Issue
-from ai_service import generate_action_plan, chat_with_civic_assistant
+from ai_interfaces import get_ai_services, initialize_ai_services
+from ai_factory import create_all_ai_services
 from maharashtra_locator import (
     find_constituency_by_pincode,
     find_mla_by_constituency,
@@ -13,7 +14,6 @@ from maharashtra_locator import (
     load_maharashtra_mla_data
 )
 from pydantic import BaseModel
-from gemini_summary import generate_mla_summary
 import json
 import os
 import shutil
@@ -52,6 +52,20 @@ Base.metadata.create_all(bind=engine)
 async def lifespan(app: FastAPI):
     # Startup: Migrate DB
     migrate_db()
+
+    # Startup: Initialize AI services
+    try:
+        action_plan_service, chat_service, mla_summary_service = create_all_ai_services()
+
+        initialize_ai_services(
+            action_plan_service=action_plan_service,
+            chat_service=chat_service,
+            mla_summary_service=mla_summary_service
+        )
+        logger.info("AI services initialized successfully.")
+    except Exception as e:
+        logger.error(f"Error initializing AI services: {e}", exc_info=True)
+        raise
 
     # Startup: Load static data to avoid first-request latency
     try:
@@ -174,7 +188,8 @@ async def create_issue(
         await run_in_threadpool(save_issue_db, db, new_issue)
 
         # Generate Action Plan (AI)
-        action_plan = await generate_action_plan(description, category, image_path)
+        ai_services = get_ai_services()
+        action_plan = await ai_services.action_plan_service.generate_action_plan(description, category, image_path)
 
         return {
             "id": new_issue.id,
@@ -228,7 +243,8 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
-    response = await chat_with_civic_assistant(request.query)
+    ai_services = get_ai_services()
+    response = await ai_services.chat_service.chat(request.query)
     return {"response": response}
 
 @app.get("/api/issues/recent")
@@ -396,7 +412,8 @@ async def get_maharashtra_rep_contacts(pincode: str = Query(..., min_length=6, m
     try:
         # Only generate summary if we have a valid constituency and MLA
         if assembly_constituency and mla_info["mla_name"] != "MLA Info Unavailable":
-            description = await generate_mla_summary(
+            ai_services = get_ai_services()
+            description = await ai_services.mla_summary_service.generate_mla_summary(
                 district=constituency_info["district"],
                 assembly_constituency=assembly_constituency,
                 mla_name=mla_info["mla_name"]
