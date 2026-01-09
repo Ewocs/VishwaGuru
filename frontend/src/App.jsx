@@ -30,6 +30,14 @@ function AppContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Safe navigation helper
+  const navigateToView = (view) => {
+    const validViews = ['home', 'map', 'report', 'action', 'mh-rep', 'pothole', 'garbage', 'vandalism', 'flood', 'infrastructure'];
+    if (validViews.includes(view)) {
+      navigate(view === 'home' ? '/' : `/${view}`);
+    }
+  };
+
   // Fetch recent issues on mount
   const fetchRecentIssues = async () => {
     try {
@@ -115,7 +123,7 @@ function AppContent() {
               path="/"
               element={
                 <Home
-                  setView={(view) => navigate(`/${view}`)}
+                  setView={navigateToView}
                   fetchResponsibilityMap={fetchResponsibilityMap}
                   recentIssues={recentIssues}
                   handleUpvote={handleUpvote}
@@ -127,7 +135,7 @@ function AppContent() {
               element={
                 <MapView
                   responsibilityMap={responsibilityMap}
-                  setView={(view) => navigate(`/${view}`)}
+                  setView={navigateToView}
                 />
               }
             />
@@ -135,7 +143,7 @@ function AppContent() {
               path="/report"
               element={
                 <ReportForm
-                  setView={(view) => navigate(`/${view}`)}
+                  setView={navigateToView}
                   setLoading={setLoading}
                   setError={setError}
                   setActionPlan={setActionPlan}
@@ -148,7 +156,7 @@ function AppContent() {
               element={
                 <ActionView
                   actionPlan={actionPlan}
-                  setView={(view) => navigate(`/${view}`)}
+                  setView={navigateToView}
                 />
               }
             />
@@ -156,7 +164,7 @@ function AppContent() {
               path="/mh-rep"
               element={
                 <MaharashtraRepView
-                  setView={(view) => navigate(`/${view}`)}
+                  setView={navigateToView}
                   setLoading={setLoading}
                   setError={setError}
                   setMaharashtraRepInfo={setMaharashtraRepInfo}
