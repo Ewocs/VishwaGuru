@@ -9,6 +9,12 @@ __pycache__/
 data/*.db
 data/uploads/
 
+# ML Models
+*.pt
+*.pth
+*.onnx
+runs/
+
 # Node
 node_modules/
 dist/
