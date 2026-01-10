@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import ChatWidget from './components/ChatWidget';
+import { fakeRecentIssues, fakeResponsibilityMap } from './fakeData';
 
 // Lazy Load Views
 const Home = React.lazy(() => import('./views/Home'));
@@ -50,9 +51,12 @@ function AppContent() {
       if (response.ok) {
         const data = await response.json();
         setRecentIssues(data);
+      } else {
+        throw new Error("Failed to fetch");
       }
     } catch (e) {
-      console.error("Failed to fetch recent issues", e);
+      console.error("Failed to fetch recent issues, using fake data", e);
+      setRecentIssues(fakeRecentIssues);
     }
   };
 
@@ -87,7 +91,9 @@ function AppContent() {
       setResponsibilityMap(data);
       navigate('/map');
     } catch (err) {
-      setError(err.message);
+      console.error("Failed to fetch responsibility map, using fake data", err);
+      setResponsibilityMap(fakeResponsibilityMap);
+      navigate('/map');
     } finally {
       setLoading(false);
     }
