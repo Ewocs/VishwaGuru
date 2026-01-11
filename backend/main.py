@@ -40,6 +40,7 @@ from init_db import migrate_db
 import logging
 import time
 import httpx
+from cache import recent_issues_cache
 
 # Configure structured logging
 logging.basicConfig(
@@ -47,16 +48,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-# Simple in-memory cache
-# NOTE: This cache is process-local. In a multi-worker environment (e.g., Gunicorn with multiple workers),
-# this cache will not be shared across workers. For production scaling, consider using an external cache
-# like Redis (e.g., redis-py) to share state across processes.
-RECENT_ISSUES_CACHE = {
-    "data": None,
-    "timestamp": 0,
-    "ttl": 60  # seconds
-}
 
 # Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
@@ -223,7 +214,7 @@ async def create_issue(
         await run_in_threadpool(save_issue_db, db, new_issue)
 
         # Invalidate cache
-        RECENT_ISSUES_CACHE["data"] = None
+        recent_issues_cache.invalidate()
 
         return {
             "id": new_issue.id,
@@ -283,9 +274,9 @@ async def chat_endpoint(request: ChatRequest):
 
 @app.get("/api/issues/recent")
 def get_recent_issues(db: Session = Depends(get_db)):
-    current_time = time.time()
-    if RECENT_ISSUES_CACHE["data"] and (current_time - RECENT_ISSUES_CACHE["timestamp"] < RECENT_ISSUES_CACHE["ttl"]):
-        return RECENT_ISSUES_CACHE["data"]
+    cached_data = recent_issues_cache.get()
+    if cached_data:
+        return cached_data
 
     # Fetch last 10 issues
     issues = db.query(Issue).order_by(Issue.created_at.desc()).limit(10).all()
@@ -307,8 +298,7 @@ def get_recent_issues(db: Session = Depends(get_db)):
         for i in issues
     ]
 
-    RECENT_ISSUES_CACHE["data"] = data
-    RECENT_ISSUES_CACHE["timestamp"] = current_time
+    recent_issues_cache.set(data)
 
     return data
 
