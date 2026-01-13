@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.concurrency import run_in_threadpool
@@ -278,8 +279,9 @@ def get_recent_issues(db: Session = Depends(get_db)):
     cached_data = recent_issues_cache.get()
     if cached_data:
         # Check if cached data is already serialized (list of dicts)
-        # If we return it directly, FastAPI will re-validate it against the response_model
-        return cached_data
+        # We return JSONResponse directly to bypass FastAPI's Pydantic validation/serialization
+        # which is redundant for cached data that was already validated when stored.
+        return JSONResponse(content=cached_data)
 
     # Fetch last 10 issues
     issues = db.query(Issue).order_by(Issue.created_at.desc()).limit(10).all()
@@ -311,7 +313,7 @@ def get_recent_issues(db: Session = Depends(get_db)):
             latitude=i.latitude,
             longitude=i.longitude,
             action_plan=action_plan_val
-        ).model_dump()) # Store as dict in cache
+        ).model_dump(mode='json')) # Store as JSON-compatible dict in cache
 
     recent_issues_cache.set(data)
 
