@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import ChatWidget from './components/ChatWidget';
 import { fakeRecentIssues, fakeResponsibilityMap } from './fakeData';
+import { issuesApi, miscApi } from './api';
 
 // Lazy Load Views
 const Home = React.lazy(() => import('./views/Home'));
@@ -25,9 +26,6 @@ const BlockedRoadDetector = React.lazy(() => import('./BlockedRoadDetector'));
 const TreeDetector = React.lazy(() => import('./TreeDetector'));
 const PestDetector = React.lazy(() => import('./PestDetector'));
 
-// Get API URL from environment variable, fallback to relative URL for local dev
-const API_URL = import.meta.env.VITE_API_URL || '';
-
 // Create a wrapper component to handle state management
 function AppContent() {
   const navigate = useNavigate();
@@ -49,13 +47,8 @@ function AppContent() {
   // Fetch recent issues on mount
   const fetchRecentIssues = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/issues/recent`);
-      if (response.ok) {
-        const data = await response.json();
-        setRecentIssues(data);
-      } else {
-        throw new Error("Failed to fetch");
-      }
+      const data = await issuesApi.getRecent();
+      setRecentIssues(data);
     } catch (e) {
       console.error("Failed to fetch recent issues, using fake data", e);
       setRecentIssues(fakeRecentIssues);
@@ -68,15 +61,11 @@ function AppContent() {
 
   const handleUpvote = async (id) => {
     try {
-        const response = await fetch(`${API_URL}/api/issues/${id}/vote`, {
-            method: 'POST'
-        });
-        if (response.ok) {
-            // Update local state to reflect change immediately (optimistic UI or re-fetch)
-            setRecentIssues(prev => prev.map(issue =>
-                issue.id === id ? { ...issue, upvotes: (issue.upvotes || 0) + 1 } : issue
-            ));
-        }
+        await issuesApi.vote(id);
+        // Update local state to reflect change immediately (optimistic UI or re-fetch)
+        setRecentIssues(prev => prev.map(issue =>
+            issue.id === id ? { ...issue, upvotes: (issue.upvotes || 0) + 1 } : issue
+        ));
     } catch (e) {
         console.error("Failed to upvote", e);
     }
@@ -87,9 +76,7 @@ function AppContent() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/api/responsibility-map`);
-      if (!response.ok) throw new Error('Failed to fetch data');
-      const data = await response.json();
+      const data = await miscApi.getResponsibilityMap();
       setResponsibilityMap(data);
       navigate('/map');
     } catch (err) {

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Any
 from datetime import datetime
 
@@ -24,8 +24,7 @@ class IssueResponse(BaseModel):
     longitude: Optional[float] = None
     action_plan: Optional[Any] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class IssueCreateResponse(BaseModel):
     id: int
