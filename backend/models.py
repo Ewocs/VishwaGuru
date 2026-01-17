@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Float, Text
-from database import Base
+from backend.database import Base
+
 import datetime
 
 class Issue(Base):

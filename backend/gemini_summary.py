@@ -16,12 +16,14 @@ logger = logging.getLogger(__name__)
 # Suppress deprecation warnings from google.generativeai
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 
-# Configure Gemini (mandatory environment variable)
+# Configure Gemini (optional for local / mock mode)
 api_key = os.environ.get("GEMINI_API_KEY")
-if not api_key:
-    raise ValueError("GEMINI_API_KEY environment variable is required but not set. Please set it in your environment variables.")
-genai.configure(api_key=api_key)
 
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    # Gemini disabled (mock/local mode)
+    genai = None
 
 def _get_fallback_summary(mla_name: str, assembly_constituency: str, district: str) -> str:
     """

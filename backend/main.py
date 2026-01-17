@@ -1,33 +1,60 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
-from database import engine, get_db
-from models import Base, Issue
-from ai_interfaces import get_ai_services, initialize_ai_services
-from ai_factory import create_all_ai_services
-from maharashtra_locator import (
+from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from functools import lru_cache
+from typing import List
+from datetime import datetime, timedelta
+from PIL import Image
+
+import json
+import os
+import shutil
+import uuid
+import asyncio
+import logging
+import time
+import httpx
+
+from backend.database import engine, get_db
+from backend.models import Base, Issue
+from backend.schemas import (
+    IssueResponse,
+    IssueCreateResponse,
+    DetectionResponse,
+    ActionPlan,
+    ChatRequest
+)
+from backend.cache import recent_issues_cache
+from backend.init_db import migrate_db
+
+from backend.ai_interfaces import get_ai_services, initialize_ai_services
+from backend.ai_factory import create_all_ai_services
+
+from backend.maharashtra_locator import (
     find_constituency_by_pincode,
     find_mla_by_constituency,
     load_maharashtra_pincode_data,
     load_maharashtra_mla_data
 )
-from pydantic import BaseModel
-import json
-import os
-import shutil
-from functools import lru_cache
-import uuid
-import asyncio
-from fastapi import Depends
-from contextlib import asynccontextmanager
-from bot import run_bot
-from pothole_detection import detect_potholes
-from garbage_detection import detect_garbage
-from unified_detection_service import detect_vandalism, detect_flooding, detect_infrastructure, get_detection_status
-from hf_service import (
+
+from backend.bot import run_bot
+
+from backend.pothole_detection import detect_potholes
+from backend.garbage_detection import detect_garbage
+
+from backend.unified_detection_service import (
+    detect_vandalism,
+    detect_flooding,
+    detect_infrastructure,
+    get_detection_status
+)
+
+from backend.hf_service import (
     detect_vandalism_clip,
     detect_flooding_clip,
     detect_infrastructure_clip,
@@ -41,14 +68,7 @@ from hf_service import (
     detect_severity_clip,
     generate_image_caption
 )
-from PIL import Image
-from init_db import migrate_db
-import logging
-import time
-import httpx
-from cache import recent_issues_cache
-from typing import List
-from schemas import IssueResponse, IssueCreateResponse, DetectionResponse, ActionPlan, ChatRequest
+
 
 # Configure structured logging
 logging.basicConfig(
@@ -198,21 +218,37 @@ async def create_issue(
     db: Session = Depends(get_db)
 ):
     try:
+        # --- Deduplication Check (last 10 minutes) ---
+        time_window = datetime.utcnow() - timedelta(minutes=10)
+
+        duplicate_issue = db.query(Issue).filter(
+            Issue.description == description,
+            Issue.location == location,
+            Issue.created_at >= time_window
+        ).first()
+
+        if duplicate_issue:
+            logger.info("Duplicate issue detected, skipping creation.")
+            raise HTTPException(
+                status_code=409,
+                detail="A similar issue was already reported recently."
+            )
+        # --- End Deduplication Check ---
+
         # Save image if provided
         image_path = None
         if image:
             upload_dir = "data/uploads"
             os.makedirs(upload_dir, exist_ok=True)
-            # Generate unique filename
             filename = f"{uuid.uuid4()}_{image.filename}"
             image_path = os.path.join(upload_dir, filename)
-
-            # Offload blocking file I/O to threadpool
             await run_in_threadpool(save_file_blocking, image.file, image_path)
 
         # Generate Action Plan (AI)
         ai_services = get_ai_services()
-        action_plan_data = await ai_services.action_plan_service.generate_action_plan(description, category, image_path)
+        action_plan_data = await ai_services.action_plan_service.generate_action_plan(
+            description, category, image_path
+        )
 
         # Serialize action plan to JSON string for storage
         action_plan_json = json.dumps(action_plan_data) if action_plan_data else None
@@ -241,6 +277,10 @@ async def create_issue(
             message="Issue reported successfully",
             action_plan=action_plan_data
         )
+
+    except HTTPException:
+        raise
+
     except Exception as e:
         logger.error(f"Error creating issue: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")

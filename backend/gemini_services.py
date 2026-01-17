@@ -3,9 +3,12 @@ Concrete implementations of AI service interfaces using Gemini AI.
 """
 from typing import Dict, Optional
 import asyncio
-from ai_interfaces import ActionPlanService, ChatService, MLASummaryService
-from ai_service import generate_action_plan as _generate_action_plan, chat_with_civic_assistant as _chat_with_civic_assistant
-from gemini_summary import generate_mla_summary as _generate_mla_summary
+from backend.ai_interfaces import ActionPlanService, ChatService, MLASummaryService
+from backend.ai_service import (
+    generate_action_plan as _generate_action_plan,
+    chat_with_civic_assistant as _chat_with_civic_assistant
+)
+from backend.gemini_summary import generate_mla_summary as _generate_mla_summary
 
 
 class GeminiActionPlanService(ActionPlanService):
