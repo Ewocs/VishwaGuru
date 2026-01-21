@@ -12,3 +12,6 @@ opencv-python-headless
 huggingface-hub
 httpx
 python-magic
+pytest
+pytest-cov
+pytest-asyncio
