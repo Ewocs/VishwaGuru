@@ -118,12 +118,19 @@ def reset_model():
         _model_initialized = False
         _model_loading_error = None
         logger.info("Model singleton state has been reset.")
-    global _model
-    if _model is None:
-        with _model_lock:
-            if _model is None:  # Double check inside lock
-                _model = load_model()
-    return _model
+
+def validate_image_for_processing(image):
+    """
+    Validates that the image is a valid PIL Image and can be processed.
+    Uses image.load() to verify integrity without closing the file pointer.
+    """
+    try:
+        image.load()
+        return True
+    except Exception as e:
+        logger.error(f"Image validation failed: {e}")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Invalid image content")
 
 def detect_potholes(image_source):
     """

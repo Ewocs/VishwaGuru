@@ -247,3 +247,11 @@ async def detect_flooding_local(image: Image.Image, client=None):
     except Exception as e:
         logger.error(f"Local Flooding Detection Error: {e}")
         return []
+
+async def get_detection_status():
+    """Get status of local detection model."""
+    model = get_general_model()
+    return {
+        "model_loaded": model is not None,
+        "backend": "local_yolo"
+    }

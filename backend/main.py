@@ -19,6 +19,30 @@ import asyncio
 import logging
 import time
 import magic
+import httpx
+
+from backend.database import engine, Base, SessionLocal, get_db
+from backend.models import Issue
+from backend.schemas import IssueResponse, ChatRequest
+from backend.bot import run_bot
+from backend.ai_factory import create_all_ai_services
+from backend.ai_service import generate_action_plan, chat_with_civic_assistant
+from backend.maharashtra_locator import (
+    load_maharashtra_pincode_data,
+    load_maharashtra_mla_data,
+    find_constituency_by_pincode,
+    find_mla_by_constituency
+)
+from backend.init_db import migrate_db
+from backend.pothole_detection import detect_potholes, validate_image_for_processing
+from backend.garbage_detection import detect_garbage
+from backend.local_ml_service import (
+    detect_infrastructure_local,
+    detect_flooding_local,
+    detect_vandalism_local,
+    get_detection_status
+)
+from backend.gemini_services import get_ai_services, initialize_ai_services
 
 # Configure structured logging
 logging.basicConfig(
@@ -447,7 +471,7 @@ async def detect_pothole_endpoint(image: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Detection service temporarily unavailable")
 
 @app.post("/api/detect-infrastructure")
-async def detect_infrastructure_endpoint(image: UploadFile = File(...)):
+async def detect_infrastructure_endpoint(request: Request, image: UploadFile = File(...)):
     # Validate uploaded file
     validate_uploaded_file(image)
     
@@ -473,7 +497,7 @@ async def detect_infrastructure_endpoint(image: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Detection service temporarily unavailable")
 
 @app.post("/api/detect-flooding")
-async def detect_flooding_endpoint(image: UploadFile = File(...)):
+async def detect_flooding_endpoint(request: Request, image: UploadFile = File(...)):
     # Validate uploaded file
     validate_uploaded_file(image)
     
@@ -499,7 +523,7 @@ async def detect_flooding_endpoint(image: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Detection service temporarily unavailable")
 
 @app.post("/api/detect-vandalism")
-async def detect_vandalism_endpoint(image: UploadFile = File(...)):
+async def detect_vandalism_endpoint(request: Request, image: UploadFile = File(...)):
     # Validate uploaded file
     validate_uploaded_file(image)
     
