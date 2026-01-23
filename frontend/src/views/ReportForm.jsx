@@ -20,6 +20,30 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
   const [severity, setSeverity] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [describing, setDescribing] = useState(false);
+  const [urgencyAnalysis, setUrgencyAnalysis] = useState(null);
+  const [analyzingUrgency, setAnalyzingUrgency] = useState(false);
+
+  const analyzeUrgency = async () => {
+      if (!formData.description || formData.description.length < 5) return;
+      setAnalyzingUrgency(true);
+      try {
+          const response = await fetch(`${API_URL}/api/analyze-urgency`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ description: formData.description }),
+          });
+          if (response.ok) {
+              const data = await response.json();
+              setUrgencyAnalysis(data);
+          }
+      } catch (e) {
+          console.error("Urgency analysis failed", e);
+      } finally {
+          setAnalyzingUrgency(false);
+      }
+  };
 
   const autoDescribe = async () => {
       if (!formData.image) return;
@@ -178,8 +202,24 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
               rows="3"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
+              onBlur={analyzeUrgency}
               placeholder="Describe the issue..."
             />
+            {analyzingUrgency && (
+               <div className="mt-1 text-xs text-blue-600 animate-pulse">
+                   Checking urgency...
+               </div>
+            )}
+            {urgencyAnalysis && !analyzingUrgency && (
+                <div className={`mt-2 p-2 rounded text-sm flex items-center justify-between ${
+                    urgencyAnalysis.urgency === 'High' ? 'bg-red-50 text-red-800 border border-red-200' :
+                    urgencyAnalysis.urgency === 'Medium' ? 'bg-orange-50 text-orange-800 border border-orange-200' :
+                    'bg-green-50 text-green-800 border border-green-200'
+                }`}>
+                    <span className="font-semibold">Urgency: {urgencyAnalysis.urgency}</span>
+                    <span className="text-xs opacity-75">Sentiment: {urgencyAnalysis.sentiment}</span>
+                </div>
+            )}
             {formData.image && (
                 <button
                     type="button"

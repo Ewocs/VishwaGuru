@@ -1,0 +1,231 @@
+import os
+import io
+import httpx
+import base64
+from typing import Union, List, Dict, Any
+from PIL import Image
+import logging
+
+logger = logging.getLogger(__name__)
+
+# HF_TOKEN should be set in environment variables
+token = os.environ.get("HF_TOKEN")
+headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+# Zero-Shot Image Classification Model
+CLIP_API_URL = "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32"
+
+# Image Captioning Model
+CAPTION_API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large"
+
+# Sentiment Analysis / Text Classification Model
+SENTIMENT_API_URL = "https://api-inference.huggingface.co/models/cardiffnlp/twitter-roberta-base-sentiment-latest"
+
+async def _make_request(client, url, payload):
+    try:
+        response = await client.post(url, headers=headers, json=payload, timeout=20.0)
+        if response.status_code != 200:
+            logger.error(f"HF API Error ({url}): {response.status_code} - {response.text}")
+            return []
+        return response.json()
+    except Exception as e:
+        logger.error(f"HF API Request Exception: {e}")
+        return []
+
+def _prepare_image_bytes(image: Union[Image.Image, bytes]) -> bytes:
+    if isinstance(image, bytes):
+        return image
+    img_byte_arr = io.BytesIO()
+    fmt = image.format if image.format else 'JPEG'
+    image.save(img_byte_arr, format=fmt)
+    return img_byte_arr.getvalue()
+
+async def query_hf_api(image_bytes, labels, client=None):
+    """
+    Queries Hugging Face CLIP API for zero-shot image classification.
+    """
+    image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+    payload = {
+        "inputs": image_base64,
+        "parameters": {"candidate_labels": labels}
+    }
+
+    if client:
+        return await _make_request(client, CLIP_API_URL, payload)
+
+    async with httpx.AsyncClient() as new_client:
+        return await _make_request(new_client, CLIP_API_URL, payload)
+
+async def _detect_clip_generic(image: Union[Image.Image, bytes], labels: List[str], target_labels: List[str], client: httpx.AsyncClient = None):
+    try:
+        img_bytes = _prepare_image_bytes(image)
+        results = await query_hf_api(img_bytes, labels, client=client)
+
+        if not isinstance(results, list):
+             return []
+
+        detected = []
+        for res in results:
+            if isinstance(res, dict) and res.get('label') in target_labels and res.get('score', 0) > 0.4:
+                 detected.append({
+                     "label": res['label'],
+                     "confidence": res['score'],
+                     "box": [] # CLIP doesn't provide boxes, but frontend expects this structure
+                 })
+        return detected
+    except Exception as e:
+        logger.error(f"HF Detection Error: {e}")
+        return []
+
+# --- Specific Detectors ---
+
+async def detect_illegal_parking_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["illegal parking", "car blocking driveway", "double parked", "car on sidewalk", "legal parking", "empty street"]
+    targets = ["illegal parking", "car blocking driveway", "double parked", "car on sidewalk"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_street_light_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["broken streetlight", "dark street", "street light off", "working streetlight", "daytime"]
+    targets = ["broken streetlight", "dark street", "street light off"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_fire_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["fire", "smoke", "flames", "burning", "normal scene", "safe"]
+    targets = ["fire", "smoke", "flames", "burning"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_stray_animal_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["stray dog", "stray cow", "cattle on road", "animal", "empty road"]
+    targets = ["stray dog", "stray cow", "cattle on road", "animal"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_blocked_road_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["blocked road", "road debris", "construction block", "traffic jam", "clear road"]
+    targets = ["blocked road", "road debris", "construction block"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_tree_hazard_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["fallen tree", "broken branch", "hanging branch", "healthy tree", "no tree"]
+    targets = ["fallen tree", "broken branch", "hanging branch"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_pest_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["rat", "cockroach", "mosquito swarm", "pest infestation", "clean", "no pests"]
+    targets = ["rat", "cockroach", "mosquito swarm", "pest infestation"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_severity_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    """
+    Returns a severity object: {level: 'High', confidence: 0.9, raw_label: 'critical...'}
+    """
+    labels = ["critical emergency", "high urgency", "medium urgency", "low urgency", "safe situation"]
+    img_bytes = _prepare_image_bytes(image)
+    results = await query_hf_api(img_bytes, labels, client=client)
+
+    if isinstance(results, list) and len(results) > 0:
+        top = results[0]
+        label = top.get('label')
+        score = top.get('score', 0)
+
+        level = "Low"
+        if label == "critical emergency": level = "Critical"
+        elif label == "high urgency": level = "High"
+        elif label == "medium urgency": level = "Medium"
+
+        return {"level": level, "confidence": score, "raw_label": label}
+
+    return {"level": "Unknown", "confidence": 0, "raw_label": "unknown"}
+
+async def detect_smart_scan_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    """
+    Auto-detects category from image.
+    """
+    labels = [
+        "pothole", "garbage", "flooded street", "fire accident",
+        "fallen tree", "stray animal", "blocked road", "broken streetlight",
+        "illegal parking", "graffiti vandalism", "normal street"
+    ]
+    img_bytes = _prepare_image_bytes(image)
+    results = await query_hf_api(img_bytes, labels, client=client)
+
+    if isinstance(results, list) and len(results) > 0:
+        top = results[0]
+        # Map label to internal category ID if needed, or return raw
+        return {
+            "category": top.get('label'),
+            "confidence": top.get('score'),
+            "all_scores": results[:3]
+        }
+    return {"category": "unknown", "confidence": 0}
+
+async def generate_image_caption(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    """
+    Generates a description using BLIP model.
+    """
+    img_bytes = _prepare_image_bytes(image)
+    image_base64 = base64.b64encode(img_bytes).decode('utf-8')
+    payload = {"inputs": image_base64} # BLIP API usually takes raw bytes or base64?
+    # Standard Inference API for image-to-text usually takes raw bytes body
+
+    # NOTE: The standard Inference API for image-to-text (BLIP) accepts binary body.
+    # The _make_request helper assumes JSON. Let's handle this separately.
+
+    try:
+        headers_bin = {"Authorization": f"Bearer {token}"} if token else {}
+        async def do_post(c):
+             return await c.post(CAPTION_API_URL, headers=headers_bin, content=img_bytes, timeout=20.0)
+
+        if client:
+            response = await do_post(client)
+        else:
+            async with httpx.AsyncClient() as new_client:
+                response = await do_post(new_client)
+
+        if response.status_code == 200:
+            # Result is usually [{"generated_text": "..."}]
+            data = response.json()
+            if isinstance(data, list) and len(data) > 0:
+                return data[0].get('generated_text', '')
+            if isinstance(data, dict):
+                return data.get('generated_text', '')
+        else:
+            logger.error(f"Caption API Error: {response.status_code} - {response.text}")
+            return ""
+    except Exception as e:
+        logger.error(f"Caption Generation Error: {e}")
+        return ""
+    return ""
+
+async def analyze_urgency_text(text: str, client: httpx.AsyncClient = None):
+    """
+    Analyzes text urgency using Sentiment Analysis.
+    Negative sentiment -> Higher Urgency.
+    """
+    if not text: return {"urgency": "Low", "score": 0}
+
+    payload = {"inputs": text}
+
+    if client:
+        result = await _make_request(client, SENTIMENT_API_URL, payload)
+    else:
+        async with httpx.AsyncClient() as new_client:
+            result = await _make_request(new_client, SENTIMENT_API_URL, payload)
+
+    # Result format: [[{'label': 'negative', 'score': 0.9}, ...]] (nested list)
+    if isinstance(result, list) and len(result) > 0:
+        scores = result[0] # List of dicts
+        if isinstance(scores, list):
+            # Find label with highest score
+            top = max(scores, key=lambda x: x['score'])
+            label = top['label'] # 'positive', 'neutral', 'negative'
+            score = top['score']
+
+            urgency = "Low"
+            if label == "negative":
+                urgency = "High"
+            elif label == "neutral":
+                urgency = "Medium"
+
+            return {"urgency": urgency, "score": score, "sentiment": label}
+
+    return {"urgency": "Low", "score": 0, "sentiment": "unknown"}

@@ -43,6 +43,19 @@ from backend.local_ml_service import (
     get_detection_status
 )
 from backend.gemini_services import get_ai_services, initialize_ai_services
+from backend.hf_api_service import (
+    detect_illegal_parking_clip,
+    detect_street_light_clip,
+    detect_fire_clip,
+    detect_stray_animal_clip,
+    detect_blocked_road_clip,
+    detect_tree_hazard_clip,
+    detect_pest_clip,
+    detect_severity_clip,
+    detect_smart_scan_clip,
+    generate_image_caption,
+    analyze_urgency_text
+)
 
 # Configure structured logging
 logging.basicConfig(
@@ -391,6 +404,19 @@ def get_responsibility_map():
     except Exception as e:
         logger.error(f"Error loading responsibility map: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+class UrgencyRequest(BaseModel):
+    description: str
+
+@app.post("/api/analyze-urgency")
+async def analyze_urgency_endpoint(request: Request, urgency_req: UrgencyRequest):
+    try:
+        client = request.app.state.http_client
+        result = await analyze_urgency_text(urgency_req.description, client=client)
+        return result
+    except Exception as e:
+        logger.error(f"Urgency analysis error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Urgency service temporarily unavailable")
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):

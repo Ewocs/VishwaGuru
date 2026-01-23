@@ -45,6 +45,13 @@ const Home = ({ setView, fetchResponsibilityMap, recentIssues, handleUpvote }) =
 
   return (
   <div className="space-y-8 pb-12">
+    <div className="flex justify-end">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-100 shadow-sm">
+            <Shield size={14} />
+            AI-Powered Privacy Protection Active
+        </span>
+    </div>
+
     {/* Header Stats & CTA */}
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Impact Widget */}
