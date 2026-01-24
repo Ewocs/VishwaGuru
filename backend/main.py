@@ -82,9 +82,44 @@ ALLOWED_MIME_TYPES = {
     'image/tiff'
 }
 
+# User upload limits
+UPLOAD_LIMIT_PER_USER = 5  # max uploads per user per hour
+UPLOAD_LIMIT_PER_IP = 10  # max uploads per IP per hour
+user_upload_cache = {}  # dict of user/ip -> list of timestamps
+
+def check_upload_limits(identifier: str, limit: int) -> None:
+    """
+    Check if the user/IP has exceeded upload limits.
+    Cleans up old timestamps (older than 1 hour).
+    """
+    now = datetime.now()
+    one_hour_ago = now - timedelta(hours=1)
+    
+    if identifier not in user_upload_cache:
+        user_upload_cache[identifier] = []
+    
+    # Clean up old timestamps
+    user_upload_cache[identifier] = [
+        ts for ts in user_upload_cache[identifier] if ts > one_hour_ago
+    ]
+    
+    if len(user_upload_cache[identifier]) >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Upload limit exceeded. Maximum {limit} uploads per hour allowed."
+        )
+    
+    user_upload_cache[identifier].append(now)
+
 def _validate_uploaded_file_sync(file: UploadFile) -> None:
     """
     Synchronous validation logic to be run in a threadpool.
+    
+    Security measures:
+    - File size limits
+    - MIME type validation using content detection
+    - Image content validation using PIL
+    - TODO: Add virus/malware scanning (consider integrating ClamAV or similar)
     """
     # Check file size
     file.file.seek(0, 2)  # Seek to end
@@ -110,6 +145,21 @@ def _validate_uploaded_file_sync(file: UploadFile) -> None:
                 status_code=400,
                 detail=f"Invalid file type. Only image files are allowed. Detected: {detected_mime}"
             )
+        
+        # Additional content validation: Try to open with PIL to ensure it's a valid image
+        try:
+            img = Image.open(file.file)
+            img.verify()  # Verify the image is not corrupted
+            file.file.seek(0)  # Reset after PIL operations
+        except Exception as pil_error:
+            logger.error(f"PIL validation failed for {file.filename}: {pil_error}")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid image file. The file appears to be corrupted or not a valid image."
+            )
+            
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error validating file {file.filename}: {e}")
         raise HTTPException(
@@ -295,8 +345,26 @@ async def ml_status():
     )
 
 def save_file_blocking(file_obj, path):
-    with open(path, "wb") as buffer:
-        shutil.copyfileobj(file_obj, buffer)
+    """
+    Save uploaded file with security measures:
+    - Strip EXIF metadata from images to protect privacy
+    - For non-images, save as-is
+    """
+    try:
+        # Try to open as image with PIL
+        img = Image.open(file_obj)
+        # Strip EXIF data by creating a new image without metadata
+        img_no_exif = Image.new(img.mode, img.size)
+        img_no_exif.putdata(list(img.getdata()))
+        # Save without EXIF
+        img_no_exif.save(path, format=img.format)
+        logger.info(f"Saved image {path} with EXIF metadata stripped")
+    except Exception:
+        # If not an image or PIL fails, save as binary
+        file_obj.seek(0)  # Reset in case PIL read some
+        with open(path, "wb") as buffer:
+            shutil.copyfileobj(file_obj, buffer)
+        logger.info(f"Saved file {path} as binary (not an image or PIL failed)")
 
 def save_issue_db(db: Session, issue: Issue):
     db.add(issue)
@@ -306,6 +374,7 @@ def save_issue_db(db: Session, issue: Issue):
 
 @app.post("/api/issues", response_model=IssueCreateResponse, status_code=201)
 async def create_issue(
+    request: Request,
     background_tasks: BackgroundTasks,
     description: str = Form(..., min_length=10, max_length=1000),
     category: str = Form(..., pattern=f"^({'|'.join([cat.value for cat in IssueCategory])})$"),
@@ -317,6 +386,15 @@ async def create_issue(
     db: Session = Depends(get_db)
 ):
     image_path = None
+    
+    # Check upload limits if image is being uploaded
+    if image:
+        # Get client IP
+        client_ip = request.client.host if request.client else "unknown"
+        # Use user_email if provided, otherwise IP
+        identifier = user_email if user_email else client_ip
+        limit = UPLOAD_LIMIT_PER_USER if user_email else UPLOAD_LIMIT_PER_IP
+        check_upload_limits(identifier, limit)
     
     try:
         # Validate uploaded image if provided
