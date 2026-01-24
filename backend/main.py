@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from functools import lru_cache
@@ -26,10 +26,12 @@ from backend.cache import recent_issues_cache, user_upload_cache
 from backend.database import engine, Base, SessionLocal, get_db
 from backend.models import Issue
 from backend.schemas import (
-    IssueResponse, IssueCreateRequest, IssueCreateResponse, ChatRequest, ChatResponse,
+    IssueResponse, IssueSummaryResponse, IssueCreateRequest, IssueCreateResponse, ChatRequest, ChatResponse,
     VoteRequest, VoteResponse, DetectionResponse, UrgencyAnalysisRequest,
     UrgencyAnalysisResponse, HealthResponse, MLStatusResponse, ResponsibilityMapResponse,
-    ErrorResponse, SuccessResponse, IssueCategory, IssueStatus
+    ErrorResponse, SuccessResponse, IssueCategory, IssueStatus,
+    IssueStatusUpdateRequest, IssueStatusUpdateResponse,
+    PushSubscriptionRequest, PushSubscriptionResponse
 )
 from backend.exceptions import EXCEPTION_HANDLERS
 from backend.bot import run_bot, start_bot_thread, stop_bot_thread
@@ -452,7 +454,8 @@ async def create_issue(
         current_cache = recent_issues_cache.get("recent_issues")
         if current_cache:
             # Create a dict representation of the new issue
-            new_issue_dict = IssueResponse(
+            # Using IssueSummaryResponse to match the list view optimization
+            new_issue_dict = IssueSummaryResponse(
                 id=new_issue.id,
                 category=new_issue.category,
                 description=new_issue.description[:100] + "..." if len(new_issue.description) > 100 else new_issue.description,
@@ -462,8 +465,8 @@ async def create_issue(
                 upvotes=new_issue.upvotes if new_issue.upvotes is not None else 0,
                 location=new_issue.location,
                 latitude=new_issue.latitude,
-                longitude=new_issue.longitude,
-                action_plan=new_issue.action_plan
+                longitude=new_issue.longitude
+                # action_plan excluded
             ).model_dump(mode='json')
 
             # Prepend new issue to the list (atomic operation)
@@ -645,19 +648,19 @@ async def chat_endpoint(request: ChatRequest):
         logger.error(f"Chat service error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Chat service temporarily unavailable")
 
-@app.get("/api/issues/recent", response_model=List[IssueResponse])
+@app.get("/api/issues/recent", response_model=List[IssueSummaryResponse])
 def get_recent_issues(db: Session = Depends(get_db)):
     cached_data = recent_issues_cache.get("recent_issues")
     if cached_data:
         return JSONResponse(content=cached_data)
 
-    # Fetch last 10 issues
-    issues = db.query(Issue).order_by(Issue.created_at.desc()).limit(10).all()
+    # Fetch last 10 issues, deferring action_plan for performance
+    issues = db.query(Issue).options(defer(Issue.action_plan)).order_by(Issue.created_at.desc()).limit(10).all()
 
     # Convert to Pydantic models for validation and serialization
     data = []
     for i in issues:
-        data.append(IssueResponse(
+        data.append(IssueSummaryResponse(
             id=i.id,
             category=i.category,
             description=i.description[:100] + "..." if len(i.description) > 100 else i.description,
@@ -667,8 +670,8 @@ def get_recent_issues(db: Session = Depends(get_db)):
             upvotes=i.upvotes if i.upvotes is not None else 0,
             location=i.location,
             latitude=i.latitude,
-            longitude=i.longitude,
-            action_plan=i.action_plan
+            longitude=i.longitude
+            # action_plan is deferred and excluded
         ).model_dump(mode='json'))
 
     # Thread-safe cache update
