@@ -13,6 +13,15 @@ VishwaGuru is an open source platform empowering India's youth to engage with de
 
 VishwaGuru uses a unified backend architecture where a single FastAPI service powers the web frontend, AI services, database operations, and the Telegram bot.
 
+### Architecture Diagrams
+
+📋 **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Complete deployment architecture with ASCII diagrams
+- System components and data flow
+- Environment configuration
+- Deployment topology
+
+> **Note:** Visual architecture diagrams are currently missing. ASCII diagrams are available in [ARCHITECTURE.md](./ARCHITECTURE.md).
+
 ### High-Level Flow
 
 1. Users submit civic issues via Web UI or Telegram.
