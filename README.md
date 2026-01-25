@@ -564,3 +564,18 @@ Found a bug? Have a feature request?
 ---
 
 
+fix-ui-setup-docs
+This project is licensed under the **AGPL-3.0** License.
+ 
+ ## 🛠️ Project Setup (Local)
+
+### Prerequisites
+- Node.js v18 or above
+- npm (comes with Node.js)
+- Git
+
+Check versions:
+```bash
+node -v
+npm -v
+ 
