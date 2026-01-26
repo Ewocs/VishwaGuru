@@ -106,6 +106,9 @@ class PushSubscriptionResponse(BaseModel):
 class DetectionRequest(BaseModel):
     detections: List[Dict[str, Any]] = Field(..., description="List of detected objects/items")
 
+class DetectionResponse(BaseModel):
+    detections: List[Dict[str, Any]] = Field(..., description="List of detected objects/items")
+
 class UrgencyAnalysisRequest(BaseModel):
     description: str = Field(..., min_length=10, max_length=1000, description="Issue description")
     category: IssueCategory = Field(..., description="Issue category")
