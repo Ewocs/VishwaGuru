@@ -72,8 +72,7 @@ async def retry_with_exponential_backoff(
                 logger.error(f"Function {func.__name__} failed after {max_retries + 1} attempts: {e}")
                 raise AIServiceException(
                     f"AI service operation failed after {max_retries + 1} attempts",
-                    service="Gemini",
-                    details={"function": func.__name__, "error": str(e)}
+                    details={"service": "Gemini", "function": func.__name__, "error": str(e)}
                 ) from e
 
             # Calculate delay with exponential backoff
@@ -176,8 +175,7 @@ async def generate_action_plan(issue_description: str, category: str, language: 
         logger.error(f"Gemini action plan generation failed after retries: {e}")
         raise AIServiceException(
             "Failed to generate action plan",
-            service="Gemini",
-            details={"error": str(e)}
+            details={"service": "Gemini", "error": str(e)}
         ) from e
 
 @alru_cache(maxsize=100)
@@ -210,6 +208,5 @@ async def chat_with_civic_assistant(query: str) -> str:
         logger.error(f"Gemini chat failed after retries: {e}")
         raise AIServiceException(
             "Failed to process chat request",
-            service="Gemini",
-            details={"error": str(e)}
+            details={"service": "Gemini", "error": str(e)}
         ) from e
