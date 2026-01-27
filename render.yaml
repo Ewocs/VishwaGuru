@@ -18,6 +18,8 @@ services:
       # Required API Keys (must be set in Render dashboard)
       - key: GEMINI_API_KEY
         sync: false
+      - key: HF_TOKEN
+        sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       # Frontend URL (must be set to your Netlify deployment URL)

@@ -40,6 +40,12 @@ def validate_environment():
     if not os.getenv("DEBUG"):
         os.environ["DEBUG"] = "false"
 
+    # Check for optional HF_TOKEN
+    if not os.getenv("HF_TOKEN"):
+        print("⚠️  HF_TOKEN is missing. AI features using Hugging Face will be disabled.")
+    else:
+        print("✅ HF_TOKEN found")
+
     print("✅ Environment validation passed")
     return True
 
