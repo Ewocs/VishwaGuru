@@ -29,6 +29,8 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
   const [analyzingUrgency, setAnalyzingUrgency] = useState(false);
   const [depthMap, setDepthMap] = useState(null);
   const [analyzingDepth, setAnalyzingDepth] = useState(false);
+  const [smartCategory, setSmartCategory] = useState(null);
+  const [analyzingSmartScan, setAnalyzingSmartScan] = useState(false);
   const [submitStatus, setSubmitStatus] = useState({ state: 'idle', message: '' });
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -136,11 +138,54 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
       }
   };
 
+  const mapSmartScanToCategory = (label) => {
+      const map = {
+          'pothole': 'road',
+          'garbage': 'garbage',
+          'flooded street': 'water',
+          'fire accident': 'road',
+          'fallen tree': 'road',
+          'stray animal': 'road',
+          'blocked road': 'road',
+          'broken streetlight': 'streetlight',
+          'illegal parking': 'road',
+          'graffiti vandalism': 'college_infra',
+          'normal street': 'road'
+      };
+      return map[label] || 'road';
+  };
+
+  const analyzeSmartScan = async (file) => {
+      if (!file) return;
+      setAnalyzingSmartScan(true);
+      setSmartCategory(null);
+
+      const uploadData = new FormData();
+      uploadData.append('image', file);
+
+      try {
+          const data = await detectorsApi.smartScan(uploadData);
+          if (data && data.category && data.category !== 'unknown') {
+              const mappedCategory = mapSmartScanToCategory(data.category);
+              setSmartCategory({
+                  original: data.category,
+                  mapped: mappedCategory,
+                  confidence: data.confidence
+              });
+          }
+      } catch (e) {
+          console.error("Smart scan failed", e);
+      } finally {
+          setAnalyzingSmartScan(false);
+      }
+  };
+
   const handleImageChange = (e) => {
       const file = e.target.files[0];
       if (file) {
           setFormData({...formData, image: file});
           analyzeImage(file);
+          analyzeSmartScan(file);
       }
   };
 
@@ -266,6 +311,29 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
               <option value="college_infra">College Infrastructure</option>
               <option value="women_safety">Women Safety</option>
             </select>
+            {analyzingSmartScan && (
+                <div className="text-xs text-blue-600 mt-1 animate-pulse flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin"/>
+                    AI is analyzing image for category...
+                </div>
+            )}
+            {smartCategory && (
+                <div
+                    onClick={() => setFormData({...formData, category: smartCategory.mapped})}
+                    className="mt-2 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100 p-2 rounded-lg cursor-pointer hover:bg-purple-100 transition flex items-center justify-between group"
+                >
+                    <div className="flex items-center gap-2">
+                        <span className="text-lg">✨</span>
+                        <div>
+                            <p className="text-xs text-purple-800 font-bold uppercase tracking-wide">AI Suggestion</p>
+                            <p className="text-sm font-medium text-purple-900 capitalize">{smartCategory.original}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white text-purple-600 px-3 py-1 rounded text-xs font-bold shadow-sm group-hover:shadow transition">
+                        Apply
+                    </div>
+                </div>
+            )}
           </div>
 
           <div>

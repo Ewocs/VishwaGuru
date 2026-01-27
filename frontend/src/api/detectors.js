@@ -49,4 +49,5 @@ export const detectorsApi = {
   treeHazard: createDetectorApi('/api/detect-tree-hazard'),
   pest: createDetectorApi('/api/detect-pest'),
   depth: createDetectorApi('/api/analyze-depth'),
+  smartScan: createDetectorApi('/api/detect-smart-scan'),
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { miscApi } from '../api';
-import { Trophy, Medal, User, ArrowLeft, Star } from 'lucide-react';
+import { Trophy, Medal, User, ArrowLeft, Star, Shield } from 'lucide-react';
 
 const LeaderboardView = ({ setView }) => {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -66,7 +66,15 @@ const LeaderboardView = ({ setView }) => {
                          <div className="bg-blue-100 p-1.5 rounded-full text-blue-600">
                              <User size={16} />
                          </div>
-                         <span className="font-medium text-gray-800 text-sm">{entry.user_email}</span>
+                         <div className="flex flex-col">
+                             <span className="font-medium text-gray-800 text-sm">{entry.user_email}</span>
+                             {entry.reports_count > 5 && (
+                                 <span className="flex items-center gap-1 text-[10px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full border border-purple-100 w-fit">
+                                     <Shield size={10} fill="currentColor" />
+                                     Civic Hero
+                                 </span>
+                             )}
+                         </div>
                       </div>
                       <div className="col-span-2 text-center font-semibold text-gray-700">
                          {entry.reports_count}
