@@ -215,6 +215,96 @@ npm install
 
 ---
 
+## 🧪 Testing
+
+VishwaGuru includes comprehensive test suites for both backend and frontend components, plus verification scripts to ensure functionality.
+
+### Backend Testing
+
+<div align="center">
+
+#### Python Test Suite
+
+| Test Type | Command | Description |
+|-----------|---------|-------------|
+| 🧪 **All Tests** | `cd backend && python -m pytest tests/` | Run complete backend test suite |
+| 📊 **Coverage** | `cd backend && python -m pytest --cov=. tests/` | Run tests with coverage report |
+| 🔍 **Specific Test** | `cd backend && python -m pytest tests/test_api_validation.py` | Run individual test file |
+
+</div>
+
+**Available Backend Tests:**
+- API validation and endpoints
+- Bot integration
+- Cache functionality
+- AI services (Gemini, HuggingFace)
+- Infrastructure detection
+- Spatial deduplication
+- Thread safety tests
+- Maharashtra locator
+- Model validation
+
+### Frontend Testing
+
+<div align="center">
+
+#### React Test Suite
+
+| Test Type | Command | Description |
+|-----------|---------|-------------|
+| 🧪 **Unit Tests** | `cd frontend && npm test` | Run Jest test suite |
+| 👀 **Watch Mode** | `cd frontend && npm run test:watch` | Run tests in watch mode |
+| 📊 **Coverage** | `cd frontend && npm run test:coverage` | Generate coverage report |
+
+</div>
+
+### Verification Scripts
+
+<div align="center">
+
+#### Feature Verification
+
+| Script | Purpose |
+|--------|---------|
+| `python verification/verify_frontend_features.py` | Verify frontend functionality |
+| `python verification/verify_ui.py` | UI component verification |
+| `python verification/verify_stats.py` | Statistics feature verification |
+| `python verification/verify_new_features.py` | New feature validation |
+
+</div>
+
+**Quick Verification:**
+```bash
+# Run all verification scripts
+python verification/verify_frontend_features.py
+python verification/verify_ui.py
+python verification/verify_stats.py
+```
+
+### Test Structure
+
+```
+tests/                    # Backend Python tests
+├── test_api_validation.py
+├── test_bot_integration.py
+├── test_cache_update.py
+├── test_hf_service.py
+├── test_infrastructure_endpoint.py
+└── ... (20+ test files)
+
+verification/            # Feature verification scripts
+├── verify_frontend_features.py
+├── verify_ui.py
+├── verify_stats.py
+└── ... (additional verifiers)
+
+frontend/                # Frontend tests via Jest
+├── src/__tests__/
+└── package.json (test scripts)
+```
+
+---
+
 ## ☁️ Deployment Options
 
 <div align="center">
