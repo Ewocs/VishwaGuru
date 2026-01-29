@@ -6,7 +6,7 @@ Thank you for your interest in contributing to VishwaGuru! This guide will help 
 
 ### Prerequisites
 - Python 3.8+
-- Node.js 18+ and npm
+- Node.js 20+ and npm
 - Git
 - Telegram Bot Token (from @BotFather)
 - Google Gemini API Key

@@ -131,8 +131,7 @@ graph TD
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| 🐍 **Python** | 3.8+ | Backend runtime |
-| ⚛️ **Node.js** | 18+ | Frontend build tools |
+| ⚛️ **Node.js** | 20+ | Frontend build tools |
 | 📦 **npm** | Latest | Package management |
 | 🐙 **Git** | 2.0+ | Version control |
 
@@ -570,7 +569,7 @@ This project is licensed under the **AGPL-3.0** License.
  ## 🛠️ Project Setup (Local)
 
 ### Prerequisites
-- Node.js v18 or above
+- Node.js v20 or above
 - npm (comes with Node.js)
 - Git
 
