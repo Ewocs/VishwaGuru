@@ -146,7 +146,7 @@ graph TD
 
 ```bash
 git clone https://github.com/Ewocs/VishwaGuru.git
-cd vishwaguru
+cd VishwaGuru
 ```
 
 ### 2. ⚙️ Backend Setup
@@ -375,7 +375,7 @@ Found a bug? Have a feature request?
 
 ```bash
 git clone https://github.com/Ewocs/VishwaGuru.git
-cd vishwaguru
+cd VishwaGuru
 ```
 
 ### 2. ⚙️ Backend Setup
@@ -570,7 +570,7 @@ This project is licensed under the **AGPL-3.0** License.
  ## 🛠️ Project Setup (Local)
 
 ### Prerequisites
-- Node.js v18 or above
+- Node.js v20 or above
 - npm (comes with Node.js)
 - Git
 
