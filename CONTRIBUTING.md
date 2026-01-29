@@ -5,7 +5,7 @@ Thank you for your interest in contributing to VishwaGuru! This guide will help 
 ## Getting Started
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.12+
 - Node.js 20+ and npm
 - Git
 - Telegram Bot Token (from @BotFather)
