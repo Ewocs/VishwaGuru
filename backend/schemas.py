@@ -188,3 +188,38 @@ class LeaderboardEntry(BaseModel):
 
 class LeaderboardResponse(BaseModel):
     leaderboard: List[LeaderboardEntry] = Field(..., description="List of top reporters")
+
+
+# Escalation-related schemas
+class EscalationAuditResponse(BaseModel):
+    id: int = Field(..., description="Escalation audit record ID")
+    grievance_id: int = Field(..., description="Associated grievance ID")
+    previous_authority: str = Field(..., description="Previous authority handling the grievance")
+    new_authority: str = Field(..., description="New authority after escalation")
+    timestamp: datetime = Field(..., description="When the escalation occurred")
+    reason: str = Field(..., description="Reason for escalation (SLA_BREACH, SEVERITY_UPGRADE, MANUAL)")
+
+class GrievanceSummaryResponse(BaseModel):
+    id: int = Field(..., description="Grievance ID")
+    unique_id: str = Field(..., description="Unique grievance identifier")
+    category: str = Field(..., description="Issue category")
+    severity: str = Field(..., description="Severity level (LOW, MEDIUM, HIGH, CRITICAL)")
+    pincode: Optional[str] = Field(None, description="Pincode")
+    city: Optional[str] = Field(None, description="City")
+    district: Optional[str] = Field(None, description="District")
+    state: Optional[str] = Field(None, description="State")
+    current_jurisdiction_id: int = Field(..., description="Current jurisdiction ID")
+    assigned_authority: str = Field(..., description="Currently assigned authority")
+    sla_deadline: datetime = Field(..., description="SLA deadline")
+    status: str = Field(..., description="Current status")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    resolved_at: Optional[datetime] = Field(None, description="Resolution timestamp")
+    escalation_history: List[EscalationAuditResponse] = Field(default_factory=list, description="Escalation history")
+
+class EscalationStatsResponse(BaseModel):
+    total_grievances: int = Field(..., description="Total number of grievances")
+    escalated_grievances: int = Field(..., description="Number of escalated grievances")
+    active_grievances: int = Field(..., description="Number of active grievances")
+    resolved_grievances: int = Field(..., description="Number of resolved grievances")
+    escalation_rate: float = Field(..., description="Percentage of grievances that were escalated")

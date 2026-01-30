@@ -83,15 +83,13 @@ const Home = ({ setView, fetchResponsibilityMap, recentIssues, handleUpvote }) =
       ]
     },
     {
-      title: t('home.categories.civicServices'),
-      icon: <Building size={20} className="text-indigo-600" />,
+      title: t('home.categories.management'),
+      icon: <Monitor size={20} className="text-gray-600" />,
       items: [
-        { id: 'report', label: t('home.issues.reportIssue'), icon: <AlertTriangle size={24} />, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { id: 'infrastructure', label: t('home.issues.brokenInfra'), icon: <Zap size={24} />, color: 'text-yellow-600', bg: 'bg-yellow-50' },
-        { id: 'vandalism', label: t('home.issues.graffiti'), icon: <Brush size={24} />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { id: 'mh-rep', label: t('home.issues.findMLA'), icon: <Search size={24} />, color: 'text-purple-600', bg: 'bg-purple-50' },
-        { id: 'accessibility', label: "Accessibility", icon: <Accessibility size={24} />, color: 'text-teal-600', bg: 'bg-teal-50' },
-        { id: 'severity', label: "Urgency Check", icon: <Siren size={24} />, color: 'text-red-600', bg: 'bg-red-50' },
+        { id: 'grievance', label: t('home.issues.grievanceManagement'), icon: <AlertTriangle size={24} />, color: 'text-orange-600', bg: 'bg-orange-50' },
+        { id: 'stats', label: t('home.issues.viewStats'), icon: <Activity size={24} />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { id: 'leaderboard', label: t('home.issues.leaderboard'), icon: <Trophy size={24} />, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+        { id: 'map', label: t('home.issues.responsibilityMap'), icon: <MapPin size={24} />, color: 'text-green-600', bg: 'bg-green-50' },
       ]
     }
   ];

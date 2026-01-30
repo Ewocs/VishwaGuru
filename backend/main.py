@@ -27,7 +27,7 @@ import httpx
 
 from backend.cache import recent_issues_cache, user_upload_cache
 from backend.database import engine, Base, SessionLocal, get_db
-from backend.models import Issue, PushSubscription
+from backend.models import Issue, PushSubscription, Grievance, EscalationAudit, Jurisdiction
 from backend.schemas import (
     IssueResponse, IssueSummaryResponse, IssueCreateRequest, IssueCreateResponse, ChatRequest, ChatResponse,
     VoteRequest, VoteResponse, DetectionResponse, UrgencyAnalysisRequest,
@@ -36,7 +36,8 @@ from backend.schemas import (
     IssueStatusUpdateRequest, IssueStatusUpdateResponse,
     PushSubscriptionRequest, PushSubscriptionResponse,
     NearbyIssueResponse, DeduplicationCheckResponse, IssueCreateWithDeduplicationResponse,
-    LeaderboardResponse, LeaderboardEntry
+    LeaderboardResponse, LeaderboardEntry,
+    EscalationAuditResponse, GrievanceSummaryResponse, EscalationStatsResponse
 )
 from backend.exceptions import EXCEPTION_HANDLERS
 from backend.bot import run_bot, start_bot_thread, stop_bot_thread
@@ -49,6 +50,8 @@ from backend.maharashtra_locator import (
     find_mla_by_constituency
 )
 from backend.init_db import migrate_db
+from backend.pothole_detection import detect_potholes, validate_image_for_processing
+from backend.grievance_service import GrievanceService
 from backend.pothole_detection import detect_potholes, validate_image_for_processing
 from backend.garbage_detection import detect_garbage
 from backend.local_ml_service import (
@@ -238,6 +241,66 @@ async def process_action_plan_background(issue_id: int, description: str, catego
     finally:
         db.close()
 
+async def create_grievance_from_issue_background(issue_id: int):
+    """Background task to create a grievance from an issue for escalation management"""
+    db = SessionLocal()
+    try:
+        # Get the issue
+        issue = db.query(Issue).filter(Issue.id == issue_id).first()
+        if not issue:
+            logger.error(f"Issue {issue_id} not found for grievance creation")
+            return
+
+        # Get grievance service
+        grievance_service = GrievanceService()
+
+        # Map issue category to grievance severity
+        severity_mapping = {
+            'pothole': 'high',
+            'garbage': 'medium',
+            'streetlight': 'medium',
+            'flood': 'critical',
+            'infrastructure': 'high',
+            'parking': 'low',
+            'fire': 'critical',
+            'animal': 'medium',
+            'blocked': 'high',
+            'tree': 'medium',
+            'pest': 'low',
+            'vandalism': 'medium'
+        }
+
+        severity = severity_mapping.get(issue.category.lower(), 'medium')
+
+        # Create grievance data
+        grievance_data = {
+            'category': issue.category,
+            'severity': severity,
+            'pincode': None,  # Will be determined by routing service
+            'description': issue.description,
+            'location': {
+                'latitude': issue.latitude,
+                'longitude': issue.longitude,
+                'address': issue.location
+            },
+            'reporter_info': {
+                'email': issue.user_email,
+                'source': issue.source
+            }
+        }
+
+        # Create grievance
+        grievance = grievance_service.create_grievance(grievance_data, db)
+        if grievance:
+            logger.info(f"Created grievance {grievance.id} from issue {issue_id}")
+        else:
+            logger.error(f"Failed to create grievance from issue {issue_id}")
+
+    except Exception as e:
+        logger.error(f"Error creating grievance from issue {issue_id}: {e}", exc_info=True)
+    finally:
+        db.close()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Migrate DB
@@ -259,6 +322,15 @@ async def lifespan(app: FastAPI):
         logger.info("AI services initialized successfully.")
     except Exception as e:
         logger.error(f"Error initializing AI services: {e}", exc_info=True)
+        raise
+
+    # Startup: Initialize Grievance Service
+    try:
+        grievance_service = GrievanceService()
+        app.state.grievance_service = grievance_service
+        logger.info("Grievance service initialized successfully.")
+    except Exception as e:
+        logger.error(f"Error initializing grievance service: {e}", exc_info=True)
         raise
 
     # Startup: Load static data to avoid first-request latency
@@ -580,6 +652,9 @@ async def create_issue(
     # Add background task for AI generation only if new issue was created
     if new_issue:
         background_tasks.add_task(process_action_plan_background, new_issue.id, description, category, language, image_path)
+        
+        # Create grievance for escalation management
+        background_tasks.add_task(create_grievance_from_issue_background, new_issue.id)
 
         # Optimistic Cache Update with thread-safe operations
         try:
@@ -1607,6 +1682,177 @@ def send_status_notification(issue_id: int, old_status: str, new_status: str, no
         logger.error(f"Error sending status notification: {e}")
     finally:
         db.close()
+
+# Escalation API Endpoints
+@app.get("/api/grievances", response_model=List[GrievanceSummaryResponse])
+def get_grievances(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of results"),
+    offset: int = Query(0, ge=0, description="Number of results to skip"),
+    db: Session = Depends(get_db)
+):
+    """Get list of grievances with escalation history"""
+    try:
+        query = db.query(Grievance).options(
+            joinedload(Grievance.audit_logs),
+            joinedload(Grievance.jurisdiction)
+        )
+
+        if status:
+            query = query.filter(Grievance.status == status)
+        if category:
+            query = query.filter(Grievance.category == category)
+
+        grievances = query.offset(offset).limit(limit).all()
+
+        # Convert to response format
+        result = []
+        for grievance in grievances:
+            escalation_history = [
+                EscalationAuditResponse(
+                    id=audit.id,
+                    grievance_id=audit.grievance_id,
+                    previous_authority=audit.previous_authority,
+                    new_authority=audit.new_authority,
+                    timestamp=audit.timestamp,
+                    reason=audit.reason.value
+                )
+                for audit in grievance.audit_logs
+            ]
+
+            result.append(GrievanceSummaryResponse(
+                id=grievance.id,
+                unique_id=grievance.unique_id,
+                category=grievance.category,
+                severity=grievance.severity.value,
+                pincode=grievance.pincode,
+                city=grievance.city,
+                district=grievance.district,
+                state=grievance.state,
+                current_jurisdiction_id=grievance.current_jurisdiction_id,
+                assigned_authority=grievance.assigned_authority,
+                sla_deadline=grievance.sla_deadline,
+                status=grievance.status.value,
+                created_at=grievance.created_at,
+                updated_at=grievance.updated_at,
+                resolved_at=grievance.resolved_at,
+                escalation_history=escalation_history
+            ))
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting grievances: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve grievances")
+
+@app.get("/api/grievances/{grievance_id}", response_model=GrievanceSummaryResponse)
+def get_grievance(grievance_id: int, db: Session = Depends(get_db)):
+    """Get detailed grievance information with escalation history"""
+    try:
+        grievance = db.query(Grievance).options(
+            joinedload(Grievance.audit_logs),
+            joinedload(Grievance.jurisdiction)
+        ).filter(Grievance.id == grievance_id).first()
+
+        if not grievance:
+            raise HTTPException(status_code=404, detail="Grievance not found")
+
+        escalation_history = [
+            EscalationAuditResponse(
+                id=audit.id,
+                grievance_id=audit.grievance_id,
+                previous_authority=audit.previous_authority,
+                new_authority=audit.new_authority,
+                timestamp=audit.timestamp,
+                reason=audit.reason.value
+            )
+            for audit in grievance.audit_logs
+        ]
+
+        return GrievanceSummaryResponse(
+            id=grievance.id,
+            unique_id=grievance.unique_id,
+            category=grievance.category,
+            severity=grievance.severity.value,
+            pincode=grievance.pincode,
+            city=grievance.city,
+            district=grievance.district,
+            state=grievance.state,
+            current_jurisdiction_id=grievance.current_jurisdiction_id,
+            assigned_authority=grievance.assigned_authority,
+            sla_deadline=grievance.sla_deadline,
+            status=grievance.status.value,
+            created_at=grievance.created_at,
+            updated_at=grievance.updated_at,
+            resolved_at=grievance.resolved_at,
+            escalation_history=escalation_history
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting grievance {grievance_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve grievance")
+
+@app.get("/api/escalation-stats", response_model=EscalationStatsResponse)
+def get_escalation_stats(db: Session = Depends(get_db)):
+    """Get escalation statistics"""
+    try:
+        total_grievances = db.query(func.count(Grievance.id)).scalar()
+        escalated_grievances = db.query(func.count(Grievance.id)).filter(Grievance.status == "escalated").scalar()
+        active_grievances = db.query(func.count(Grievance.id)).filter(Grievance.status.in_(["open", "in_progress"])).scalar()
+        resolved_grievances = db.query(func.count(Grievance.id)).filter(Grievance.status == "resolved").scalar()
+
+        escalation_rate = (escalated_grievances / total_grievances * 100) if total_grievances > 0 else 0
+
+        return EscalationStatsResponse(
+            total_grievances=total_grievances,
+            escalated_grievances=escalated_grievances,
+            active_grievances=active_grievances,
+            resolved_grievances=resolved_grievances,
+            escalation_rate=escalation_rate
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting escalation stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve escalation statistics")
+
+@app.post("/api/grievances/{grievance_id}/escalate")
+def manual_escalate_grievance(
+    grievance_id: int,
+    reason: str = Query(..., description="Reason for manual escalation"),
+    db: Session = Depends(get_db)
+):
+    """Manually escalate a grievance"""
+    try:
+        grievance_service = getattr(db.get_bind()._app.state, 'grievance_service', None)
+        if not grievance_service:
+            raise HTTPException(status_code=500, detail="Grievance service not available")
+
+        # Get the grievance
+        grievance = db.query(Grievance).filter(Grievance.id == grievance_id).first()
+        if not grievance:
+            raise HTTPException(status_code=404, detail="Grievance not found")
+
+        # Perform manual escalation
+        success = grievance_service.escalation_engine.escalate_grievance_severity(
+            grievance_id=grievance_id,
+            new_severity=grievance.severity,  # Keep same severity, just escalate jurisdiction
+            reason=reason,
+            db=db
+        )
+
+        if success:
+            return {"message": "Grievance escalated successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to escalate grievance")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error escalating grievance {grievance_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to escalate grievance")
 
 # Note: Frontend serving code removed for separate deployment
 # The frontend will be deployed on Netlify and make API calls to this backend

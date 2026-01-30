@@ -13,6 +13,7 @@ const MaharashtraRepView = React.lazy(() => import('./views/MaharashtraRepView')
 const VerifyView = React.lazy(() => import('./views/VerifyView'));
 const StatsView = React.lazy(() => import('./views/StatsView'));
 const LeaderboardView = React.lazy(() => import('./views/LeaderboardView'));
+const GrievanceView = React.lazy(() => import('./views/GrievanceView'));
 const NotFound = React.lazy(() => import('./views/NotFound'));
 
 // Lazy Load Detectors
@@ -47,7 +48,7 @@ function AppContent() {
 
   // Safe navigation helper
   const navigateToView = (view) => {
-    const validViews = ['home', 'map', 'report', 'action', 'mh-rep', 'stats', 'leaderboard', 'pothole', 'garbage', 'vandalism', 'flood', 'infrastructure', 'parking', 'streetlight', 'fire', 'animal', 'blocked', 'tree', 'pest', 'smart-scan', 'noise', 'water-leak', 'accessibility', 'crowd', 'severity'];
+    const validViews = ['home', 'map', 'report', 'action', 'mh-rep', 'stats', 'leaderboard', 'grievance', 'pothole', 'garbage', 'vandalism', 'flood', 'infrastructure', 'parking', 'streetlight', 'fire', 'animal', 'blocked', 'tree', 'pest', 'smart-scan', 'noise', 'water-leak', 'accessibility', 'crowd', 'severity'];
     if (validViews.includes(view)) {
       navigate(view === 'home' ? '/' : `/${view}`);
     }
@@ -197,6 +198,14 @@ function AppContent() {
               path="/leaderboard"
               element={
                 <LeaderboardView
+                  setView={navigateToView}
+                />
+              }
+            />
+            <Route
+              path="/grievance"
+              element={
+                <GrievanceView
                   setView={navigateToView}
                 />
               }
