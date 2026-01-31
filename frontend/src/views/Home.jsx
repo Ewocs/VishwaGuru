@@ -5,7 +5,7 @@ import {
   AlertTriangle, MapPin, Search, Activity, Camera, Trash2, ThumbsUp, Brush,
   Droplets, Zap, Truck, Flame, Dog, XCircle, Lightbulb, TreeDeciduous, Bug,
   Scan, ChevronRight, LayoutGrid, Shield, Leaf, Building, CheckCircle, Trophy, Monitor,
-  Volume2, Users, Waves, Accessibility, Siren
+  Volume2, Users, Waves, Accessibility, Siren, Recycle, Eye
 } from 'lucide-react';
 
 const CameraCheckModal = ({ onClose }) => {
@@ -80,12 +80,14 @@ const Home = ({ setView, fetchResponsibilityMap, recentIssues, handleUpvote }) =
         { id: 'noise', label: "Noise", icon: <Volume2 size={24} />, color: 'text-purple-600', bg: 'bg-purple-50' },
         { id: 'crowd', label: "Crowd", icon: <Users size={24} />, color: 'text-red-500', bg: 'bg-red-50' },
         { id: 'water-leak', label: "Water Leak", icon: <Waves size={24} />, color: 'text-blue-500', bg: 'bg-blue-50' },
+        { id: 'waste', label: "Waste Sorter", icon: <Recycle size={24} />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
       ]
     },
     {
       title: t('home.categories.management'),
       icon: <Monitor size={20} className="text-gray-600" />,
       items: [
+        { id: 'civic-eye', label: "Civic Eye", icon: <Eye size={24} />, color: 'text-blue-600', bg: 'bg-blue-50' },
         { id: 'grievance', label: t('home.issues.grievanceManagement'), icon: <AlertTriangle size={24} />, color: 'text-orange-600', bg: 'bg-orange-50' },
         { id: 'stats', label: t('home.issues.viewStats'), icon: <Activity size={24} />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
         { id: 'leaderboard', label: t('home.issues.leaderboard'), icon: <Trophy size={24} />, color: 'text-yellow-600', bg: 'bg-yellow-50' },

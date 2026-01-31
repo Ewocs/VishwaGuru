@@ -51,4 +51,9 @@ export const detectorsApi = {
   depth: createDetectorApi('/api/analyze-depth'),
   smartScan: createDetectorApi('/api/detect-smart-scan'),
   severity: createDetectorApi('/api/detect-severity'),
+  waste: createDetectorApi('/api/detect-waste'),
+  civicEye: createDetectorApi('/api/detect-civic-eye'),
+  transcribe: async (formData) => {
+      return await apiClient.postForm('/api/transcribe-audio', formData);
+  },
 };

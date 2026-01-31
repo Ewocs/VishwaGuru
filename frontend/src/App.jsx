@@ -36,6 +36,8 @@ const DETECTORS = {
   accessibility: React.lazy(() => import('./AccessibilityDetector')),
   crowd: React.lazy(() => import('./CrowdDetector')),
   severity: React.lazy(() => import('./SeverityDetector')),
+  waste: React.lazy(() => import('./WasteDetector')),
+  'civic-eye': React.lazy(() => import('./CivicEyeDetector')),
 };
 
 // Valid view paths for navigation safety

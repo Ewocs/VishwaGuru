@@ -78,7 +78,10 @@ from backend.hf_api_service import (
     detect_water_leak_clip,
     detect_accessibility_issue_clip,
     detect_crowd_density_clip,
-    detect_audio_event
+    detect_audio_event,
+    transcribe_audio,
+    detect_waste_clip,
+    detect_civic_eye_clip
 )
 
 # Configure structured logging
@@ -1852,6 +1855,72 @@ def manual_escalate_grievance(
     except Exception as e:
         logger.error(f"Error escalating grievance {grievance_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to escalate grievance")
+
+@app.post("/api/transcribe-audio")
+async def transcribe_audio_endpoint(request: Request, file: UploadFile = File(...)):
+    # Basic audio validation
+    if hasattr(file, 'size') and file.size and file.size > 25 * 1024 * 1024:
+         raise HTTPException(status_code=413, detail="Audio file too large (max 25MB)")
+
+    try:
+        audio_bytes = await file.read()
+    except Exception as e:
+        logger.error(f"Invalid audio file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid audio file")
+
+    try:
+        client = request.app.state.http_client
+        text = await transcribe_audio(audio_bytes, client=client)
+        return {"text": text}
+    except Exception as e:
+        logger.error(f"Audio transcription error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/detect-waste")
+async def detect_waste_endpoint(request: Request, image: UploadFile = File(...)):
+    # Validate uploaded file
+    await validate_uploaded_file(image)
+
+    try:
+        image_bytes = await image.read()
+    except Exception as e:
+        logger.error(f"Invalid image file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    try:
+        client = request.app.state.http_client
+        # Cache key
+        image_hash = hashlib.md5(image_bytes).hexdigest()
+        cache_key = f"waste_{image_hash}"
+
+        result = await get_cached_or_compute(cache_key, detect_waste_clip, image_bytes, client)
+        return result
+    except Exception as e:
+        logger.error(f"Waste detection error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/detect-civic-eye")
+async def detect_civic_eye_endpoint(request: Request, image: UploadFile = File(...)):
+    # Validate uploaded file
+    await validate_uploaded_file(image)
+
+    try:
+        image_bytes = await image.read()
+    except Exception as e:
+        logger.error(f"Invalid image file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    try:
+        client = request.app.state.http_client
+        # Cache key
+        image_hash = hashlib.md5(image_bytes).hexdigest()
+        cache_key = f"civic_eye_{image_hash}"
+
+        result = await get_cached_or_compute(cache_key, detect_civic_eye_clip, image_bytes, client)
+        return result
+    except Exception as e:
+        logger.error(f"Civic Eye detection error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # Note: Frontend serving code removed for separate deployment
 # The frontend will be deployed on Netlify and make API calls to this backend
